@@ -6,6 +6,7 @@ from transformers import CamembertModel
 from src import utils
 
 class Contriever(CamembertModel):
+  """ Class to wrap around actual model """
   def __init__(self, config, pooling="average", **kwargs):
     super().__init__(config, add_pooling_layer=False)
     if not hasattr(config, "pooling"):
