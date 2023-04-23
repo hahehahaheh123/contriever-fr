@@ -14,87 +14,87 @@ logger = logging.getLogger(__name__)
 
 
 def init_logger(args, stdout_only=False):
-# initialize logging system (where logger outputs are, its handlers, config settings, all that jazz)
-  if torch.distributed.is_initialized():
-    torch.distributed.barrier()  # pause process until others have reached this point
-  stdout_handler = logging.StreamHandler(sys.stdout)  # specify logging output (to file-like object)
-  handlers = [stdout_handler]
-  if not stdout_only:
-    file_handler = logging.FileHandler(filename=os.path.join(args.output_dir, "run.log"))
-    # second logging output (to disk file)
-    handlers.append(file_handler)
+    # initialize logging system (where logger outputs are, its handlers, config settings, all that jazz)
+    if torch.distributed.is_initialized():
+        torch.distributed.barrier()  # pause process until others have reached this point
+    stdout_handler = logging.StreamHandler(sys.stdout)  # specify logging output (to file-like object)
+    handlers = [stdout_handler]
+    if not stdout_only:
+        file_handler = logging.FileHandler(filename=os.path.join(args.output_dir, "run.log"))
+        # second logging output (to disk file)
+        handlers.append(file_handler)
     
-  logging.basicConfig(
-    datefmt="%m/%d/%Y %H:%M:%S",
-    level=logging.INFO if dist_utils.is_main() else logging.WARN,  # set log message level
-    format="[%(asctime)s] {%(filename)s:%(linedo)d} %(levelname)s - %(message)s",
-    handlers=handlers,
-  )
-  return logger
-    
-  
+    logging.basicConfig(
+        datefmt="%m/%d/%Y %H:%M:%S",
+        level=logging.INFO if dist_utils.is_main() else logging.WARN,  # set log message level
+        format="[%(asctime)s] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s",
+        handlers=handlers,
+    )
+    return logger
+
+
 def symlink_force(target, link_name):
-# establish a soft link (unix file pointer)
-  try:
-    os.symlink(target, link_name)
-  except OSError as e:
-    if e.errno == errno.EEXIST:
-      os.remove(link_name)
-      os.symlink(target, link_name)
-    else:
-      raise e
+    # establish a soft link (unix file pointer)
+    try:
+        os.symlink(target, link_name)
+    except OSError as e:
+        if e.errno == errno.EEXIST:
+            os.remove(link_name)
+            os.symlink(target, link_name)
+        else:
+            raise e
       
-      
+   
 def save(model, optimizer, scheduler, step, opt, dir_path, name):
   
-  # establish all directories
-  model_to_save = model.module if hasattr(model, "module") else model  # ?
-  path = os.path.join(dir_path, "checkpoint")
-  epoch_path = os.path.join(path, name)  # "step-%s" % step)
-  os.makedirs(epoch_path, exist_ok=True)  # creates any intermediate missing directories
-  cp = os.path.join(path, "latest")
-  fp = os.path.join(epoch_path, "checkpoint.pth")
-  
-  # save checkpoint dict in dir_path/checkpoint/name/checkpoint.pth
-  checkpoint = {
-    "step": step
-    "model": model_to_save.state_dict(),
-    "optimizer": optimizer.state_dict(),
-    "scheduler": scheduler.state_dict(),
-    "opt": opt,
-  }
-  torch.save(checkpoint, fp)
-  # establish dir_path/checkpoint/latest as a pointer to dir_path/checkpoint/name
-  symlink_force(epoch_path, cp)
-  if not name == "lastlog":
-    logger.info(f"Saving model to {epoch_path}")
+    # establish all directories
+    model_to_save = model.module if hasattr(model, "module") else model
+    path = os.path.join(dir_path, "checkpoint")
+    epoch_path = os.path.join(path, name)  # "step-%s" % step)
+    os.makedirs(epoch_path, exist_ok=True)  # creates any intermediate missing directories
+    cp = os.path.join(path, "latest")
+    fp = os.path.join(epoch_path, "checkpoint.pth")
+    
+    # save checkpoint dict in dir_path/checkpoint/name/checkpoint.pth
+    checkpoint = {
+        "step": step,
+        "model": model_to_save.state_dict(),
+        "optimizer": optimizer.state_dict(),
+        "scheduler": scheduler.state_dict(),
+        "opt": opt,
+    }
+    torch.save(checkpoint, fp)
+    # establish dir_path/checkpoint/latest as a pointer to dir_path/checkpoint/name
+    symlink_force(epoch_path, cp)
+    if not name == "lastlog":
+        logger.info(f"Saving model to {epoch_path}")
     
     
 def load(model_class, dir_path, opt, reset_params=False):
-  """
-  1. establish directories to receive from
-  2. load opt
-  3. load model state_dict
-  4. load optimizer & scheduler state_dict
-  """
+    """
+    1. establish directories to receive from
+    2. load opt
+    3. load model state_dict
+    4. load optimizer & scheduler state_dict
+    """
     epoch_path = os.path.realpath(dir_path)  # eliminates any symlinks, returns r e a l path
     checkpoint_path = os.path.join(epoch_path, "checkpoint.pth")
     logger.info(f"loading checkpoint {checkpoint_path}")
     checkpoint = torch.load(checkpoint_path, map_location="cpu")
     opt_checkpoint = checkpoint["opt"]
     state_dict = checkpoint["model"]
-    
+
     model = model_class(opt_checkpoint)
     model.load_state_dict(state_dict, strict=True)
     model = model.cuda()
     step = checkpoint["step"]
     if not reset_params:
-      optimizer, scheduler = set_optim(opt_checkpoint, model)
-      scheduler.load_state_dict(checkpoint["scheduler"])
-      optimizer.load_state_dict(checkpoint["optimizer"])
+        optimizer, scheduler = set_optim(opt_checkpoint, model)
+        scheduler.load_state_dict(checkpoint["scheduler"])
+        optimizer.load_state_dict(checkpoint["optimizer"])
     else:
-      optimizer, scheduler = set_optim(opt, model)
-      
+        optimizer, scheduler = set_optim(opt, model)
+
     return model, optimizer, scheduler, opt_checkpoint, step
   
   
@@ -102,20 +102,20 @@ def load(model_class, dir_path, opt, reset_params=False):
 
 
 class WarmupLinearScheduler(torch.optim.lr_scheduler.LambdaLR):
-  def __init__(self, optimizer, warmup, total, ratio, last_epoch=-1):
-    self.warmup = warmup
-    self.total = total
-    self.ratio = ratio
-    super(WarmupLinearScheduler, self).__init__(optimizer, self.lr_lambda, last_epoch=last_epoch)
-    
-  def lr_lambda(self, step):
-    if step < self.warmup:
-      return (1 - self.ratio) * step / float(max(1, self.warmup))
-    
-    return max(
-      0.0,
-      1.0 + (self.ratio - 1) * (step - self.warmup) / float(max(1.0, self.total - self.warmup)),
-    )
+    def __init__(self, optimizer, warmup, total, ratio, last_epoch=-1):
+        self.warmup = warmup
+        self.total = total
+        self.ratio = ratio
+        super(WarmupLinearScheduler, self).__init__(optimizer, self.lr_lambda, last_epoch=last_epoch)
+
+    def lr_lambda(self, step):
+        if step < self.warmup:
+            return (1 - self.ratio) * step / float(max(1, self.warmup))
+
+        return max(
+            0.0,
+            1.0 + (self.ratio - 1) * (step - self.warmup) / float(max(1.0, self.total - self.warmup)),
+        )
   
 
 class CosineScheduler(torch.optim.lr_scheduler.LambdaLR):
