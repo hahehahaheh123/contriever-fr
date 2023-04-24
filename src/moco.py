@@ -65,7 +65,7 @@ class MoCo(nn.Module):
     if return_encoder_k:
       return self.encoder_k
     else:
-      return self.encoder_q\
+      return self.encoder_q
     
   def _momentum_update_key_encoder(self):
       """
