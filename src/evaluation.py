@@ -162,12 +162,6 @@ def exact_match_score(prediction, ground_truths):
 ########        RETRIEVER EVALUATION        ########
 ####################################################
 
-def eval_batch(scores, inversions, avg_topk, idx_topk):
-    for k, s in enumerate(scores):
-        s = s.cpu().numpy()
-        sorted_idx = np.argsort(-s)
-        score(sorted_idx, inversion, avg_topk, idx_topk)
-        
 def count_inversions(arr):
     inv_count = 0
     lenarr = len(arr)
@@ -190,3 +184,9 @@ def score(x, inversions, avg_topk, idx_topk):
         # number of passages required to obtain all passages from gold top-k
         idx_gold_topk = len(x) - np.argmax(below_k[::-1])
         idx_topk[k].append(idx_gold_topk)
+
+def eval_batch(scores, inversions, avg_topk, idx_topk):
+    for k, s in enumerate(scores):
+        s = s.cpu().numpy()
+        sorted_idx = np.argsort(-s)
+        score(sorted_idx, inversion, avg_topk, idx_topk
