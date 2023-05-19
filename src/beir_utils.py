@@ -173,8 +173,15 @@ def evaluate_model(
     dist_utils.barrier()
 
     if not dataset == "cqadupstack":
+        # load custom or load official dataset
         if "_CUSTOM" in dataset:
-            corpus, queries, qrels = GenericDataLoader(data_folder=data_path).load_custom()
+            corpus_path = os.path.join(data_path, "corpus_file.jsonl")
+            query_path = os.path.join(data_path, "query_file.jsonl")
+            qrels_path = os.path.join(data_path, "qrels_file.tsv")
+            corpus, queries, qrels = GenericDataLoader(
+                corpus_file=corpus_path, 
+                query_file=query_path, 
+                qrels_file=qrels_path).load_custom()
         else:
             corpus, queries, qrels = GenericDataLoader(data_folder=data_path).load(split=split)
         results = retriever.retrieve(corpus, queries)
