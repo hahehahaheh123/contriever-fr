@@ -6,7 +6,7 @@ import transformers
 from src.normalize_text import normalize
 
 
-def save(tensor, split_path):  # split_path leads to one of the 128 token splits
+def save(tensor, split_path):
     if not os.path.exists(os.path.dirname(split_path)):
         os.makedirs(os.path.dirname(split_path))
     with open(split_path, 'wb') as fout:
